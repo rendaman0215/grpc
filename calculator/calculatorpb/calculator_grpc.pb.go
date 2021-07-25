@@ -21,6 +21,11 @@ type CalculateServiceClient interface {
 	Calculate(ctx context.Context, in *CalculatorRequest, opts ...grpc.CallOption) (*CalculatorReponse, error)
 	GetPrime(ctx context.Context, in *GetPrimeRequest, opts ...grpc.CallOption) (CalculateService_GetPrimeClient, error)
 	GetAvg(ctx context.Context, opts ...grpc.CallOption) (CalculateService_GetAvgClient, error)
+	GetMax(ctx context.Context, opts ...grpc.CallOption) (CalculateService_GetMaxClient, error)
+	// Error handling
+	// This RPC will throw an exception if the number is negative
+	// The error being sent is of of type INVALID_ARGUMENT
+	SquareRoot(ctx context.Context, in *SquareRootRequest, opts ...grpc.CallOption) (*SquareRootResponse, error)
 }
 
 type calculateServiceClient struct {
@@ -106,6 +111,46 @@ func (x *calculateServiceGetAvgClient) CloseAndRecv() (*GetAvgResponse, error) {
 	return m, nil
 }
 
+func (c *calculateServiceClient) GetMax(ctx context.Context, opts ...grpc.CallOption) (CalculateService_GetMaxClient, error) {
+	stream, err := c.cc.NewStream(ctx, &CalculateService_ServiceDesc.Streams[2], "/calculator.CalculateService/GetMax", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &calculateServiceGetMaxClient{stream}
+	return x, nil
+}
+
+type CalculateService_GetMaxClient interface {
+	Send(*GetMaxRequest) error
+	Recv() (*GetMaxResponse, error)
+	grpc.ClientStream
+}
+
+type calculateServiceGetMaxClient struct {
+	grpc.ClientStream
+}
+
+func (x *calculateServiceGetMaxClient) Send(m *GetMaxRequest) error {
+	return x.ClientStream.SendMsg(m)
+}
+
+func (x *calculateServiceGetMaxClient) Recv() (*GetMaxResponse, error) {
+	m := new(GetMaxResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (c *calculateServiceClient) SquareRoot(ctx context.Context, in *SquareRootRequest, opts ...grpc.CallOption) (*SquareRootResponse, error) {
+	out := new(SquareRootResponse)
+	err := c.cc.Invoke(ctx, "/calculator.CalculateService/SquareRoot", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CalculateServiceServer is the server API for CalculateService service.
 // All implementations must embed UnimplementedCalculateServiceServer
 // for forward compatibility
@@ -113,6 +158,11 @@ type CalculateServiceServer interface {
 	Calculate(context.Context, *CalculatorRequest) (*CalculatorReponse, error)
 	GetPrime(*GetPrimeRequest, CalculateService_GetPrimeServer) error
 	GetAvg(CalculateService_GetAvgServer) error
+	GetMax(CalculateService_GetMaxServer) error
+	// Error handling
+	// This RPC will throw an exception if the number is negative
+	// The error being sent is of of type INVALID_ARGUMENT
+	SquareRoot(context.Context, *SquareRootRequest) (*SquareRootResponse, error)
 	mustEmbedUnimplementedCalculateServiceServer()
 }
 
@@ -128,6 +178,12 @@ func (UnimplementedCalculateServiceServer) GetPrime(*GetPrimeRequest, CalculateS
 }
 func (UnimplementedCalculateServiceServer) GetAvg(CalculateService_GetAvgServer) error {
 	return status.Errorf(codes.Unimplemented, "method GetAvg not implemented")
+}
+func (UnimplementedCalculateServiceServer) GetMax(CalculateService_GetMaxServer) error {
+	return status.Errorf(codes.Unimplemented, "method GetMax not implemented")
+}
+func (UnimplementedCalculateServiceServer) SquareRoot(context.Context, *SquareRootRequest) (*SquareRootResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SquareRoot not implemented")
 }
 func (UnimplementedCalculateServiceServer) mustEmbedUnimplementedCalculateServiceServer() {}
 
@@ -207,6 +263,50 @@ func (x *calculateServiceGetAvgServer) Recv() (*GetAvgRequest, error) {
 	return m, nil
 }
 
+func _CalculateService_GetMax_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(CalculateServiceServer).GetMax(&calculateServiceGetMaxServer{stream})
+}
+
+type CalculateService_GetMaxServer interface {
+	Send(*GetMaxResponse) error
+	Recv() (*GetMaxRequest, error)
+	grpc.ServerStream
+}
+
+type calculateServiceGetMaxServer struct {
+	grpc.ServerStream
+}
+
+func (x *calculateServiceGetMaxServer) Send(m *GetMaxResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *calculateServiceGetMaxServer) Recv() (*GetMaxRequest, error) {
+	m := new(GetMaxRequest)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func _CalculateService_SquareRoot_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SquareRootRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CalculateServiceServer).SquareRoot(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/calculator.CalculateService/SquareRoot",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CalculateServiceServer).SquareRoot(ctx, req.(*SquareRootRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CalculateService_ServiceDesc is the grpc.ServiceDesc for CalculateService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -218,6 +318,10 @@ var CalculateService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "Calculate",
 			Handler:    _CalculateService_Calculate_Handler,
 		},
+		{
+			MethodName: "SquareRoot",
+			Handler:    _CalculateService_SquareRoot_Handler,
+		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
@@ -228,6 +332,12 @@ var CalculateService_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "GetAvg",
 			Handler:       _CalculateService_GetAvg_Handler,
+			ClientStreams: true,
+		},
+		{
+			StreamName:    "GetMax",
+			Handler:       _CalculateService_GetMax_Handler,
+			ServerStreams: true,
 			ClientStreams: true,
 		},
 	},

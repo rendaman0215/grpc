@@ -22,7 +22,8 @@ func main() {
 
 	// doUnary(c)
 	// doServerStreaming(c)
-	doClientStreaming(c)
+	// doClientStreaming(c)
+	doBiDiStreaming(c)
 }
 
 func doUnary(c calculatorpb.CalculateServiceClient) {
@@ -97,4 +98,63 @@ func doClientStreaming(c calculatorpb.CalculateServiceClient) {
 		log.Fatalf("Error while receving response from GetAvg: %v", err)
 	}
 	fmt.Printf("Result from GetAVG: %v\n", res.GetOutput())
+}
+
+func doBiDiStreaming(c calculatorpb.CalculateServiceClient) {
+	fmt.Println("Starting to do a Bi-Directional Streaming RPC...")
+
+	requests := []*calculatorpb.GetMaxRequest{
+		{
+			Input: 1,
+		},
+		{
+			Input: 5,
+		},
+		{
+			Input: 3,
+		},
+		{
+			Input: 6,
+		},
+		{
+			Input: 2,
+		},
+		{
+			Input: 20,
+		},
+	}
+
+	stream, err := c.GetMax(context.Background())
+	if err != nil {
+		log.Fatalf("Error while calling GetMax: %v", err)
+	}
+
+	waitc := make(chan struct{})
+	// メッセージを任意の数送信 (go routine)
+	go func() {
+		for _, req := range requests {
+			fmt.Printf("Sending data: %v\n", req)
+			err := stream.Send(req)
+			if err != nil {
+				log.Fatalf("Error while sending data: %v", err)
+			}
+		}
+		stream.CloseSend()
+	}()
+	// メッセージを任意の数受信 (go routine)
+	go func() {
+		for {
+			res, err := stream.Recv()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				log.Fatalf("Error thile receiving the data: %v", err)
+			}
+			fmt.Printf("The Maximum Number for now is: %v\n", res.GetOutput())
+		}
+		close(waitc)
+	}()
+
+	<-waitc
 }

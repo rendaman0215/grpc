@@ -32,8 +32,33 @@ message GetAvgResponse {
     float output = 1;
 }
 
+message GetMaxRequest{
+    int32 input = 1;
+}
+
+message GetMaxResponse{
+    int32 output = 1;
+}
+
+message SquareRootRequest{
+    int32 number = 1;
+}
+
+message SquareRootResponse {
+    double number_root = 1;
+}
+
 service CalculateService {
     rpc Calculate(CalculatorRequest) returns (CalculatorReponse);
+
     rpc GetPrime(GetPrimeRequest) returns (stream GetPrimeResponse);
+    
     rpc GetAvg(stream GetAvgRequest) returns (GetAvgResponse);
+
+    rpc GetMax(stream GetMaxRequest) returns (stream GetMaxResponse);
+
+    // Error handling 
+    // This RPC will throw an exception if the number is negative
+    // The error being sent is of of type INVALID_ARGUMENT
+    rpc SquareRoot(SquareRootRequest) returns (SquareRootResponse);
 }
