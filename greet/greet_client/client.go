@@ -22,11 +22,10 @@ func main() {
 	defer cc.Close()
 	c := greetpb.NewGreetServiceClient(cc)
 
-	//doUnary(c)
-
-	//doServerStreaming(c)
-
-	doClientStreaming(c)
+	// doUnary(c)
+	// doServerStreaming(c)
+	// doClientStreaming(c)
+	doBiDiStreaming(c)
 }
 
 func doUnary(c greetpb.GreetServiceClient) {
@@ -119,4 +118,75 @@ func doClientStreaming(c greetpb.GreetServiceClient) {
 		log.Fatalf("Error while receiving response from LongGreet: %v", err)
 	}
 	fmt.Printf("LongGreet Response: %v\n", res)
+}
+
+func doBiDiStreaming(c greetpb.GreetServiceClient) {
+	fmt.Println("Starting to do a Bi-Directional Streaming RPC...")
+
+	requests := []*greetpb.GreetEveryoneRequest{
+		{
+			Greeting: &greetpb.Greeting{
+				FirstName: "Akashi",
+			},
+		},
+		{
+			Greeting: &greetpb.Greeting{
+				FirstName: "Aomine",
+			},
+		},
+		{
+			Greeting: &greetpb.Greeting{
+				FirstName: "Midorima",
+			},
+		},
+		{
+			Greeting: &greetpb.Greeting{
+				FirstName: "Murasakibara",
+			},
+		},
+		{
+			Greeting: &greetpb.Greeting{
+				FirstName: "Kise",
+			},
+		},
+	}
+
+	// クライアントを呼び出し、ストリームを作成
+	stream, err := c.GreetEveryone(context.Background())
+	if err != nil {
+		log.Fatalf("Error while creating the stream: %v", err)
+		return
+	}
+
+	waitc := make(chan struct{})
+	// メッセージを任意の数送信 (go routine)
+	go func() {
+		// 任意の数メッセージを送信する関数
+		for _, req := range requests {
+			fmt.Printf("Sending message: %v\n", req)
+			stream.Send(req)
+			time.Sleep(1000 * time.Millisecond)
+		}
+		stream.CloseSend()
+	}()
+
+	// メッセージを任意の数受信 (go routine)
+	go func() {
+		// 任意の数メッセージを受信する関数
+		for {
+			res, err := stream.Recv()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				log.Fatalf("Error while receiving: %v", err)
+				break
+			}
+			fmt.Printf("Received: %v\n", res.GetResult())
+		}
+		close(waitc)
+	}()
+
+	// 処理が終了するまでブロック
+	<-waitc
 }
