@@ -16,7 +16,40 @@ message GreetResponse {
     string result = 1;
 }
 
+message GreetManayTimesRequest{
+    Greeting greeting = 1;
+}
+
+message GreetManayTimesResponse {
+    string result = 1;
+}
+
+message LongGreetRequest {
+    Greeting greeting = 1;
+}
+
+message LongGreetResponse {
+    string result = 1;
+}
+
+message GreetEveryoneRequest{
+    Greeting greeting = 1;
+}
+
+message GreetEveryoneResponse{
+    string result = 1;
+}
+
 service GreetService{
-    // 単項
+    // Unary
     rpc Greet(GreetRequest) returns (GreetResponse) {};
+
+    // Server Streaming
+    rpc GreetManyTimes(GreetManayTimesRequest) returns (stream GreetManayTimesResponse) {};
+
+    // Client Streaming
+    rpc LongGreet(stream LongGreetRequest) returns (LongGreetResponse) {};
+
+    // Bi-Directional Streaming
+    rpc GreetEveryone(stream GreetEveryoneRequest) returns (stream GreetEveryoneResponse) {};
 }

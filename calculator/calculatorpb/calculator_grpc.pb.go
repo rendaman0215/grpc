@@ -19,6 +19,8 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type CalculateServiceClient interface {
 	Calculate(ctx context.Context, in *CalculatorRequest, opts ...grpc.CallOption) (*CalculatorReponse, error)
+	GetPrime(ctx context.Context, in *GetPrimeRequest, opts ...grpc.CallOption) (CalculateService_GetPrimeClient, error)
+	GetAvg(ctx context.Context, opts ...grpc.CallOption) (CalculateService_GetAvgClient, error)
 }
 
 type calculateServiceClient struct {
@@ -38,11 +40,79 @@ func (c *calculateServiceClient) Calculate(ctx context.Context, in *CalculatorRe
 	return out, nil
 }
 
+func (c *calculateServiceClient) GetPrime(ctx context.Context, in *GetPrimeRequest, opts ...grpc.CallOption) (CalculateService_GetPrimeClient, error) {
+	stream, err := c.cc.NewStream(ctx, &CalculateService_ServiceDesc.Streams[0], "/calculator.CalculateService/GetPrime", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &calculateServiceGetPrimeClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type CalculateService_GetPrimeClient interface {
+	Recv() (*GetPrimeResponse, error)
+	grpc.ClientStream
+}
+
+type calculateServiceGetPrimeClient struct {
+	grpc.ClientStream
+}
+
+func (x *calculateServiceGetPrimeClient) Recv() (*GetPrimeResponse, error) {
+	m := new(GetPrimeResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (c *calculateServiceClient) GetAvg(ctx context.Context, opts ...grpc.CallOption) (CalculateService_GetAvgClient, error) {
+	stream, err := c.cc.NewStream(ctx, &CalculateService_ServiceDesc.Streams[1], "/calculator.CalculateService/GetAvg", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &calculateServiceGetAvgClient{stream}
+	return x, nil
+}
+
+type CalculateService_GetAvgClient interface {
+	Send(*GetAvgRequest) error
+	CloseAndRecv() (*GetAvgResponse, error)
+	grpc.ClientStream
+}
+
+type calculateServiceGetAvgClient struct {
+	grpc.ClientStream
+}
+
+func (x *calculateServiceGetAvgClient) Send(m *GetAvgRequest) error {
+	return x.ClientStream.SendMsg(m)
+}
+
+func (x *calculateServiceGetAvgClient) CloseAndRecv() (*GetAvgResponse, error) {
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	m := new(GetAvgResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // CalculateServiceServer is the server API for CalculateService service.
 // All implementations must embed UnimplementedCalculateServiceServer
 // for forward compatibility
 type CalculateServiceServer interface {
 	Calculate(context.Context, *CalculatorRequest) (*CalculatorReponse, error)
+	GetPrime(*GetPrimeRequest, CalculateService_GetPrimeServer) error
+	GetAvg(CalculateService_GetAvgServer) error
 	mustEmbedUnimplementedCalculateServiceServer()
 }
 
@@ -52,6 +122,12 @@ type UnimplementedCalculateServiceServer struct {
 
 func (UnimplementedCalculateServiceServer) Calculate(context.Context, *CalculatorRequest) (*CalculatorReponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Calculate not implemented")
+}
+func (UnimplementedCalculateServiceServer) GetPrime(*GetPrimeRequest, CalculateService_GetPrimeServer) error {
+	return status.Errorf(codes.Unimplemented, "method GetPrime not implemented")
+}
+func (UnimplementedCalculateServiceServer) GetAvg(CalculateService_GetAvgServer) error {
+	return status.Errorf(codes.Unimplemented, "method GetAvg not implemented")
 }
 func (UnimplementedCalculateServiceServer) mustEmbedUnimplementedCalculateServiceServer() {}
 
@@ -84,6 +160,53 @@ func _CalculateService_Calculate_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CalculateService_GetPrime_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(GetPrimeRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(CalculateServiceServer).GetPrime(m, &calculateServiceGetPrimeServer{stream})
+}
+
+type CalculateService_GetPrimeServer interface {
+	Send(*GetPrimeResponse) error
+	grpc.ServerStream
+}
+
+type calculateServiceGetPrimeServer struct {
+	grpc.ServerStream
+}
+
+func (x *calculateServiceGetPrimeServer) Send(m *GetPrimeResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func _CalculateService_GetAvg_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(CalculateServiceServer).GetAvg(&calculateServiceGetAvgServer{stream})
+}
+
+type CalculateService_GetAvgServer interface {
+	SendAndClose(*GetAvgResponse) error
+	Recv() (*GetAvgRequest, error)
+	grpc.ServerStream
+}
+
+type calculateServiceGetAvgServer struct {
+	grpc.ServerStream
+}
+
+func (x *calculateServiceGetAvgServer) SendAndClose(m *GetAvgResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *calculateServiceGetAvgServer) Recv() (*GetAvgRequest, error) {
+	m := new(GetAvgRequest)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // CalculateService_ServiceDesc is the grpc.ServiceDesc for CalculateService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -96,6 +219,17 @@ var CalculateService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _CalculateService_Calculate_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "GetPrime",
+			Handler:       _CalculateService_GetPrime_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "GetAvg",
+			Handler:       _CalculateService_GetAvg_Handler,
+			ClientStreams: true,
+		},
+	},
 	Metadata: "calculator/calculatorpb/calculator.proto",
 }

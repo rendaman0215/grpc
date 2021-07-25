@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"net"
 
@@ -14,7 +15,7 @@ type server struct {
 	calculatorpb.UnimplementedCalculateServiceServer
 }
 
-func (s *server) Calculate(ctx context.Context, req *calculatorpb.CalculatorRequest) (*calculatorpb.CalculatorReponse, error) {
+func (*server) Calculate(ctx context.Context, req *calculatorpb.CalculatorRequest) (*calculatorpb.CalculatorReponse, error) {
 	fmt.Printf("Start calculate...\n")
 	fmt.Printf("Params: %v\n", req)
 	First := req.GetCalculate().GetFirst()
@@ -24,6 +25,43 @@ func (s *server) Calculate(ctx context.Context, req *calculatorpb.CalculatorRequ
 		Result: result,
 	}
 	return res, nil
+}
+
+func (*server) GetPrime(req *calculatorpb.GetPrimeRequest, stream calculatorpb.CalculateService_GetPrimeServer) error {
+	input := req.GetInput()
+	var k int32 = 2
+	for input > 1 {
+		if input%k == 0 {
+			fmt.Printf("Devide %d by %d \n", input, k)
+			res := &calculatorpb.GetPrimeResponse{
+				Output: k,
+			}
+			stream.Send(res)
+			input = input / k
+		} else {
+			k += 1
+		}
+	}
+	return nil
+}
+
+func (*server) GetAvg(stream calculatorpb.CalculateService_GetAvgServer) error {
+	var result int32 = 0
+	var count int32 = 0
+	for {
+		req, err := stream.Recv()
+		if err == io.EOF {
+			avg := float32(result) / float32(count)
+			return stream.SendAndClose(&calculatorpb.GetAvgResponse{
+				Output: avg,
+			})
+		}
+		if err != nil {
+			log.Fatalf("Error while receiving client streaming: %v", err)
+		}
+		result = result + req.GetInput()
+		count++
+	}
 }
 
 func main() {
